@@ -7,25 +7,29 @@ JOBS_DIR=$(dirname $(dirname "$0"))
 export PYTHONPATH=${JOBS_DIR}:$PYTHONPATH
 export MODEL_BASE="weights/stdmodels"
 
-image_path="asset_local/home.jpeg"
-image_prompt="A modern family living room with glossy tiled floors, a cozy sofa, toys scattered around, and warm vibe"
+# image_path="asset_local/home.jpeg"
+# image_prompt="A modern family living room with glossy tiled floors, a cozy sofa, toys scattered around, and warm vibe"
+image_name="dash_office1"
+image_path="asset_local/${image_name}.jpeg"
+image_prompt="A minimalist modern gallery space with clean white walls, framed posters, dark flooring, and scattered industrial objects like tires."
 nproc_per_node=2
-precision="fp8" # fp8, fp16
-model_used="distilled" # distilled, original
-action_list="w a a a a"
-action_speed_list="0.05 0.05 0.05 0.1 0.3"
-seed=25016
+precision="fp16" # fp8, fp16
+model_used="original" # distilled, original
+action_list="s d"
+action_list_compressed="${action_list// /}"
+action_speed_list="0.1 0.05"
+seed=$((RANDOM % 10000 + 1))
 
 if [ "$model_used" == "original" ]; then
     checkpoint_path="weights/gamecraft_models/mp_rank_00_model_states.pt"
     infer_steps=50
 elif [ "$model_used" == "distilled" ]; then
     checkpoint_path="weights/gamecraft_models/mp_rank_00_model_states_distill.pt"
-    infer_steps=8
+    infer_steps=1
 fi
 
 # Define save path
-save_path="./results/home_${precision}_${model_used}_${seed}"
+save_path="./results/${image_name}_${action_list_compressed}_${precision}_${model_used}_${seed}"
 
 # Create save directory if it doesn't exist
 mkdir -p "$save_path"
@@ -66,6 +70,9 @@ torchrun --nnodes=1 --nproc_per_node=${nproc_per_node} --master_port 29605 hymm_
     --save-path "$save_path" \
     $([ "$precision" == "fp8" ] && echo "--use-fp8")
 
+# #fake it
+# cp results/dash_office1_w_fp8_distilled_1169/dash_office1.mp4 $save_path/${image_name}.mp4
+
 echo "Waiting for video generation to complete..."
 
 # Wait for video files to be created (check for common video extensions)
@@ -93,6 +100,41 @@ if [ "$video_created" = false ]; then
     echo "Warning: No video file detected after waiting ${max_wait_time} seconds"
 fi
 
+# Generate icon overlay video
+echo "Generating icon overlay video..."
+
+cd "$save_path"
+# Find the generated video file
+video_file=$(find . -maxdepth 1 -name "*.mp4" -o -name "*.avi" -o -name "*.mov" -o -name "*.mkv" | head -1)
+if [ -n "$video_file" ]; then
+    # Remove ./ prefix if present
+    video_file=$(basename "$video_file")
+    
+    # Set environment variables for add_icons.py
+    export INPUT_VIDEO="$video_file"
+    export OUTPUT_VIDEO="${video_file%.*}_icon.${video_file##*.}"
+    export ACTION_LIST="$action_list"
+    export FPS="24"
+    
+    echo "Processing video: $video_file"
+    echo "Output will be: $OUTPUT_VIDEO"
+    echo "Actions: $ACTION_LIST"
+    
+    # Run add_icons.py
+    /home/nitish/anaconda3/envs/HYGameCraft/bin/python ./../../add_icons.py
+    
+    if [ $? -eq 0 ]; then
+        echo "Icon overlay video generated successfully: $OUTPUT_VIDEO"
+    else
+        echo "Error: Failed to generate icon overlay video"
+    fi
+else
+    echo "Warning: No video file found for icon generation"
+fi
+
+# Return to original directory
+cd - > /dev/null
+
 # End timing
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
@@ -114,7 +156,8 @@ cat > "$save_path/data.json" << EOF
     "infer_steps": "${infer_steps}",
     "video_created": $video_created,
     "video_files": "$(ls "$save_path"/*.mp4 "$save_path"/*.avi "$save_path"/*.mov "$save_path"/*.mkv 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')",
-    "total_wait_time_seconds": $elapsed_wait
+    "total_wait_time_seconds": $elapsed_wait,
+    "seed": ${seed}
 }
 EOF
 

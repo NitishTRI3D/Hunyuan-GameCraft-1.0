@@ -74,7 +74,7 @@ def generate_html():
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background-color: white;
             padding: 20px;
@@ -103,25 +103,32 @@ def generate_html():
             color: #495057;
         }
         .image-container {
-            width: 15%;
+            width: 12%;
         }
         .image-container img {
-            max-width: 150px;
-            max-height: 120px;
+            max-width: 120px;
+            max-height: 100px;
             border-radius: 4px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         .video-container {
-            width: 65%;
+            width: 58%;
         }
         .video-container video {
             width: 100%;
-            height: 400px;
+            height: 350px;
             border-radius: 4px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin-bottom: 10px;
+        }
+        .video-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: bold;
         }
         .params-container {
-            width: 20%;
+            width: 30%;
             text-align: left;
         }
         .show-btn {
@@ -206,7 +213,7 @@ def generate_html():
             <thead>
                 <tr>
                     <th>Image</th>
-                    <th>Video</th>
+                    <th>Videos</th>
                     <th>Parameters</th>
                 </tr>
             </thead>
@@ -255,37 +262,46 @@ def generate_html():
         print(f"Results directory not found: {results_dir}")
         return
     
-    # Get all subdirectories in results
-    folders = [d for d in os.listdir(results_dir) 
-               if os.path.isdir(os.path.join(results_dir, d))]
+    # Get all subdirectories in results with their creation times
+    folders_with_time = []
+    for d in os.listdir(results_dir):
+        folder_path = os.path.join(results_dir, d)
+        if os.path.isdir(folder_path):
+            # Get creation time (use mtime as fallback if ctime not available)
+            try:
+                creation_time = os.path.getctime(folder_path)
+            except:
+                creation_time = os.path.getmtime(folder_path)
+            folders_with_time.append((d, creation_time))
+    
+    # Sort by creation time in descending order (newest first)
+    folders_with_time.sort(key=lambda x: x[1], reverse=True)
     
     table_rows = []
     
-    for folder in sorted(folders):
+    for folder, _ in folders_with_time:
         folder_path = os.path.join(results_dir, folder)
         
         # Get image and video files
         image_files = get_image_files(folder_path)
         video_files = get_video_files(folder_path)
         
-        # Skip if more than 1 image or 1 video
-        if len(image_files) != 1 or len(video_files) != 1:
-            print(f"Skipping {folder}: Expected 1 image and 1 video, found {len(image_files)} images and {len(video_files)} videos")
+        # Skip if no image or no videos
+        if len(image_files) == 0 or len(video_files) == 0:
+            print(f"Skipping {folder}: Found {len(image_files)} images and {len(video_files)} videos")
             continue
         
+        # Use the first image
         image_file = image_files[0]
-        video_file = video_files[0]
         
         # Get relative paths for web serving (relative to outputs folder for correct HTTP serving)
         image_rel_path = os.path.relpath(image_file, outputs_dir)
-        video_rel_path = os.path.relpath(video_file, outputs_dir)
         
         # Debug: Print paths to help troubleshoot
         print(f"Folder: {folder}")
         print(f"  Image file: {image_file}")
         print(f"  Image rel path: {image_rel_path}")
-        print(f"  Video file: {video_file}")
-        print(f"  Video rel path: {video_rel_path}")
+        print(f"  Video files: {video_files}")
         print(f"  Base dir: {base_dir}")
         print(f"  Outputs dir: {outputs_dir}")
         print("---")
@@ -326,6 +342,26 @@ def generate_html():
         else:
             show_button = '<button class="show-btn" disabled>No run.sh</button>'
         
+        # Generate video HTML - show all videos
+        video_html = ""
+        for video_file in video_files:
+            video_rel_path = os.path.relpath(video_file, outputs_dir)
+            video_name = os.path.basename(video_file)
+            
+            # Determine video label
+            if "_icon" in video_name:
+                video_label = "With Icons"
+            else:
+                video_label = "Original"
+            
+            video_html += f"""
+                <div class="video-label">{video_label}</div>
+                <video controls preload="metadata">
+                    <source src="{video_rel_path}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            """
+        
         # Generate table row
         row = f"""
                 <tr>
@@ -333,10 +369,7 @@ def generate_html():
                         <img src="{image_rel_path}" alt="Image from {folder}" loading="lazy">
                     </td>
                     <td class="video-container">
-                        <video controls preload="metadata">
-                            <source src="{video_rel_path}" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video>
+                        {video_html}
                     </td>
                     <td class="params-container">
                         {params_html}
