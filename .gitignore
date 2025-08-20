@@ -1,0 +1,10 @@
+results/
+outputs/
+weights/
+weights
+
+asset_local/
+
+pycache/
+__pycache__/
+*.pyc
