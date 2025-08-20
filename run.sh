@@ -25,7 +25,7 @@ if [ "$model_used" == "original" ]; then
     infer_steps=50
 elif [ "$model_used" == "distilled" ]; then
     checkpoint_path="weights/gamecraft_models/mp_rank_00_model_states_distill.pt"
-    infer_steps=1
+    infer_steps=8
 fi
 
 # Define save path
@@ -46,8 +46,8 @@ fi
 # Copy current run.sh file to save-path folder
 script_path="$0"
 if [ -f "$script_path" ]; then
-    cp "$script_path" "$save_path/"
-    echo "Copied run.sh to $save_path/"
+    cp "$script_path" "$save_path/run.sh"
+    echo "Copied run.sh to $save_path/run.sh"
 else
     echo "Warning: Script file $script_path not found"
 fi
