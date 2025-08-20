@@ -1,0 +1,363 @@
+#!/usr/bin/env python3
+"""
+Script to generate HTML report from Hunyuan-GameCraft results folders.
+Reads results/ folders and creates an HTML table with images, videos, and parameters.
+"""
+
+import os
+import json
+import glob
+from pathlib import Path
+import re
+
+def get_image_files(folder_path):
+    """Get image files from folder (jpeg, png, jpg)"""
+    image_extensions = ['*.jpeg', '*.png', '*.jpg']
+    image_files = []
+    for ext in image_extensions:
+        image_files.extend(glob.glob(os.path.join(folder_path, ext)))
+    return image_files
+
+def get_video_files(folder_path):
+    """Get video files from folder (mp4, avi, mov, mkv)"""
+    video_extensions = ['*.mp4', '*.avi', '*.mov', '*.mkv']
+    video_files = []
+    for ext in video_extensions:
+        video_files.extend(glob.glob(os.path.join(folder_path, ext)))
+    return video_files
+
+def get_run_sh_content(folder_path):
+    """Get content of run.sh file if it exists"""
+    run_sh_path = os.path.join(folder_path, 'run.sh')
+    if os.path.exists(run_sh_path):
+        try:
+            with open(run_sh_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            return f"Error reading run.sh: {str(e)}"
+    return None
+
+def get_data_json_content(folder_path):
+    """Get content of data.json file if it exists"""
+    data_json_path = os.path.join(folder_path, 'data.json')
+    if os.path.exists(data_json_path):
+        try:
+            with open(data_json_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            return f"Error reading data.json: {str(e)}"
+    return None
+
+def generate_html():
+    """Generate HTML report from results folders"""
+    
+    # Paths
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    results_dir = os.path.join(base_dir, 'results')
+    outputs_dir = os.path.join(base_dir, 'outputs')
+    
+    # Create outputs directory if it doesn't exist
+    os.makedirs(outputs_dir, exist_ok=True)
+    
+    # HTML template
+    html_template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hunyuan-GameCraft Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+        .image-container {
+            width: 15%;
+        }
+        .image-container img {
+            max-width: 150px;
+            max-height: 120px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .video-container {
+            width: 65%;
+        }
+        .video-container video {
+            width: 100%;
+            height: 400px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .params-container {
+            width: 20%;
+            text-align: left;
+        }
+        .show-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .show-btn:hover {
+            background-color: #0056b3;
+        }
+        .show-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: #000;
+        }
+        .code-block {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 11px;
+        }
+        .params-table th, .params-table td {
+            border: 1px solid #ddd;
+            padding: 4px 6px;
+            text-align: left;
+        }
+        .params-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hunyuan-GameCraft Results Report</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Video</th>
+                    <th>Parameters</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal for showing run.sh content -->
+    <div id="runShModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>run.sh Content</h2>
+            <div id="runShContent" class="code-block"></div>
+        </div>
+    </div>
+
+    <script>
+        // Modal functionality
+        var modal = document.getElementById("runShModal");
+        var span = document.getElementsByClassName("close")[0];
+        
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+        
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+        
+        function showRunSh(contentId) {
+            var content = document.getElementById(contentId).textContent;
+            document.getElementById("runShContent").textContent = content;
+            modal.style.display = "block";
+        }
+    </script>
+</body>
+</html>
+    """
+    
+    # Check if results directory exists
+    if not os.path.exists(results_dir):
+        print(f"Results directory not found: {results_dir}")
+        return
+    
+    # Get all subdirectories in results
+    folders = [d for d in os.listdir(results_dir) 
+               if os.path.isdir(os.path.join(results_dir, d))]
+    
+    table_rows = []
+    
+    for folder in sorted(folders):
+        folder_path = os.path.join(results_dir, folder)
+        
+        # Get image and video files
+        image_files = get_image_files(folder_path)
+        video_files = get_video_files(folder_path)
+        
+        # Skip if more than 1 image or 1 video
+        if len(image_files) != 1 or len(video_files) != 1:
+            print(f"Skipping {folder}: Expected 1 image and 1 video, found {len(image_files)} images and {len(video_files)} videos")
+            continue
+        
+        image_file = image_files[0]
+        video_file = video_files[0]
+        
+        # Get relative paths for web serving (relative to outputs folder for correct HTTP serving)
+        image_rel_path = os.path.relpath(image_file, outputs_dir)
+        video_rel_path = os.path.relpath(video_file, outputs_dir)
+        
+        # Debug: Print paths to help troubleshoot
+        print(f"Folder: {folder}")
+        print(f"  Image file: {image_file}")
+        print(f"  Image rel path: {image_rel_path}")
+        print(f"  Video file: {video_file}")
+        print(f"  Video rel path: {video_rel_path}")
+        print(f"  Base dir: {base_dir}")
+        print(f"  Outputs dir: {outputs_dir}")
+        print("---")
+        
+        # Get run.sh content
+        run_sh_content = get_run_sh_content(folder_path)
+        
+        # Get data.json content
+        data_json = get_data_json_content(folder_path)
+        
+        # Generate parameters table with only specific fields
+        params_html = ""
+        if data_json:
+            params_html = '<table class="params-table">'
+            # Only show the specific fields requested
+            fields_to_show = ['execution_time_seconds', 'save_path', 'action_list', 'action_speed_list', 'precision', 'model_used']
+            for field in fields_to_show:
+                if field in data_json:
+                    value = data_json[field]
+                    if field == 'execution_time_seconds':
+                        display_value = f"{value}s"
+                    elif field == 'save_path':
+                        # Extract just the folder name from the full path
+                        display_value = os.path.basename(value)
+                    else:
+                        display_value = str(value)
+                    params_html += f'<tr><th>{field}</th><td>{display_value}</td></tr>'
+            params_html += '</table>'
+        
+        # Generate show button
+        show_button = ""
+        if run_sh_content:
+            # Store content in a data attribute to avoid JavaScript injection issues
+            content_id = f"content_{len(table_rows)}"
+            show_button = f'<button class="show-btn" onclick="showRunSh(\'{content_id}\')">Show run.sh</button>'
+            # Store content in a hidden div
+            show_button += f'<div id="{content_id}" style="display:none;">{run_sh_content}</div>'
+        else:
+            show_button = '<button class="show-btn" disabled>No run.sh</button>'
+        
+        # Generate table row
+        row = f"""
+                <tr>
+                    <td class="image-container">
+                        <img src="{image_rel_path}" alt="Image from {folder}" loading="lazy">
+                    </td>
+                    <td class="video-container">
+                        <video controls preload="metadata">
+                            <source src="{video_rel_path}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </td>
+                    <td class="params-container">
+                        {params_html}
+                        {show_button}
+                    </td>
+                </tr>
+        """
+        table_rows.append(row)
+    
+    # Generate final HTML
+    html_content = html_template.replace('{table_rows}', ''.join(table_rows))
+    
+    # Write HTML file
+    output_file = os.path.join(outputs_dir, 'results_report.html')
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    print(f"HTML report generated: {output_file}")
+    print(f"Total folders processed: {len(table_rows)}")
+    print(f"To view the report, run: python3 -m http.server 3000")
+    print(f"Then open: http://localhost:3000/outputs/results_report.html")
+
+if __name__ == "__main__":
+    generate_html()
