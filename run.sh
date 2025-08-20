@@ -9,15 +9,15 @@ export MODEL_BASE="weights/stdmodels"
 
 # image_path="asset_local/home.jpeg"
 # image_prompt="A modern family living room with glossy tiled floors, a cozy sofa, toys scattered around, and warm vibe"
-image_name="dash_office1"
+image_name="das_office2"
 image_path="asset_local/${image_name}.jpeg"
-image_prompt="A minimalist modern gallery space with clean white walls, framed posters, dark flooring, and scattered industrial objects like tires."
+image_prompt="A modern glass-walled office with racing posters, sleek furniture, glass walls"
 nproc_per_node=2
 precision="fp16" # fp8, fp16
 model_used="original" # distilled, original
-action_list="s d"
+action_list="w d d d"
 action_list_compressed="${action_list// /}"
-action_speed_list="0.1 0.05"
+action_speed_list="0.05 0.05 0.05 0.05"
 seed=$((RANDOM % 10000 + 1))
 
 if [ "$model_used" == "original" ]; then
@@ -57,7 +57,7 @@ torchrun --nnodes=1 --nproc_per_node=${nproc_per_node} --master_port 29605 hymm_
     --image-path ${image_path} \
     --prompt "${image_prompt}" \
     --add-pos-prompt "Realistic, High-quality." \
-    --add-neg-prompt "overexposed, low quality, deformation, a poor composition, bad hands, bad teeth, bad eyes, bad limbs, distortion, blurring, text, subtitles, static, picture, black border." \
+    --add-neg-prompt "overexposed, low quality, deformation, a poor composition, humans, people, bad hands, bad teeth, bad eyes, bad limbs, distortion, blurring, text, subtitles, static, picture, black border." \
     --ckpt ${checkpoint_path} \
     --video-size 704 1216 \
     --cfg-scale 2.0 \
@@ -71,7 +71,7 @@ torchrun --nnodes=1 --nproc_per_node=${nproc_per_node} --master_port 29605 hymm_
     $([ "$precision" == "fp8" ] && echo "--use-fp8")
 
 # #fake it
-# cp results/dash_office1_w_fp8_distilled_1169/dash_office1.mp4 $save_path/${image_name}.mp4
+# cp results/dash_office1_sd_fp16_original_6869/dash_office1.mp4 $save_path/${image_name}.mp4
 
 echo "Waiting for video generation to complete..."
 
@@ -90,7 +90,7 @@ while [ "$video_created" = false ] && [ $elapsed_wait -lt $max_wait_time ]; do
         video_created=true
         echo "Video file detected in $save_path"
     else
-        echo "Waiting for video... (${elapsed_wait}s elapsed)"
+        echo "Waiting for video... [${elapsed_wait}s elapsed]"
         sleep $wait_interval
         elapsed_wait=$((elapsed_wait + wait_interval))
     fi
@@ -157,9 +157,13 @@ cat > "$save_path/data.json" << EOF
     "video_created": $video_created,
     "video_files": "$(ls "$save_path"/*.mp4 "$save_path"/*.avi "$save_path"/*.mov "$save_path"/*.mkv 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')",
     "total_wait_time_seconds": $elapsed_wait,
-    "seed": ${seed}
+    "seed": ${seed},
+    "image_prompt": "${image_prompt}",
+    "action_list_compressed": "${action_list_compressed}"
 }
 EOF
 
 echo "Execution completed in ${execution_time} seconds"
 echo "Data saved to $save_path/data.json"
+
+/home/nitish/anaconda3/envs/HYGameCraft/bin/python generate_html.py

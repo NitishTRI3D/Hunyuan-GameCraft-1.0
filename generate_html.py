@@ -110,6 +110,11 @@ def generate_html():
             max-height: 100px;
             border-radius: 4px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .image-container img:hover {
+            transform: scale(1.05);
         }
         .video-container {
             width: 58%;
@@ -204,6 +209,56 @@ def generate_html():
             font-weight: bold;
             color: #495057;
         }
+        /* Image Modal Styles */
+        .image-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+        .image-modal-content {
+            background-color: transparent;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            height: 90%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .image-modal img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .image-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 35px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s ease;
+        }
+        .image-close:hover {
+            background-color: rgba(0,0,0,0.8);
+        }
     </style>
 </head>
 <body>
@@ -232,6 +287,14 @@ def generate_html():
         </div>
     </div>
 
+    <!-- Modal for showing images -->
+    <div id="imageModal" class="image-modal">
+        <div class="image-modal-content">
+            <span class="image-close">&times;</span>
+            <img id="modalImage" src="" alt="Modal Image">
+        </div>
+    </div>
+
     <script>
         // Modal functionality
         var modal = document.getElementById("runShModal");
@@ -251,6 +314,34 @@ def generate_html():
             var content = document.getElementById(contentId).textContent;
             document.getElementById("runShContent").textContent = content;
             modal.style.display = "block";
+        }
+        
+        // Image Modal functionality
+        var imageModal = document.getElementById("imageModal");
+        var imageClose = document.getElementsByClassName("image-close")[0];
+        
+        imageClose.onclick = function() {
+            imageModal.style.display = "none";
+        }
+        
+        // Close image modal when clicking outside
+        imageModal.onclick = function(event) {
+            if (event.target == imageModal) {
+                imageModal.style.display = "none";
+            }
+        }
+        
+        // Close image modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                imageModal.style.display = "none";
+            }
+        });
+        
+        function showImageModal(imageSrc, imageAlt) {
+            document.getElementById("modalImage").src = imageSrc;
+            document.getElementById("modalImage").alt = imageAlt;
+            imageModal.style.display = "block";
         }
     </script>
 </body>
@@ -317,7 +408,7 @@ def generate_html():
         if data_json:
             params_html = '<table class="params-table">'
             # Only show the specific fields requested
-            fields_to_show = ['execution_time_seconds', 'save_path', 'action_list', 'action_speed_list', 'precision', 'model_used']
+            fields_to_show = ['execution_time_seconds', 'save_path', 'action_list', 'action_speed_list', 'precision', 'model_used', 'image_prompt']
             for field in fields_to_show:
                 if field in data_json:
                     value = data_json[field]
@@ -366,7 +457,7 @@ def generate_html():
         row = f"""
                 <tr>
                     <td class="image-container">
-                        <img src="{image_rel_path}" alt="Image from {folder}" loading="lazy">
+                        <img src="{image_rel_path}" alt="Image from {folder}" loading="lazy" onclick="showImageModal('{image_rel_path}', 'Image from {folder}')">
                     </td>
                     <td class="video-container">
                         {video_html}
