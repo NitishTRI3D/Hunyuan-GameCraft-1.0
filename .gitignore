@@ -8,3 +8,6 @@ asset_local/
 pycache/
 __pycache__/
 *.pyc
+
+world_builder/Wan2.2/
+venv/
