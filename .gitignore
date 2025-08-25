@@ -11,3 +11,12 @@ __pycache__/
 
 world_builder/Wan2.2/
 venv/
+
+.env
+
+inputs/
+uploads/
+
+agent-builder/outputs
+agent-builder/inputs
+agent-builder/uploads

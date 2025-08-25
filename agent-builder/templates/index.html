@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Builder</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { background: #f5f5f5; }
+    .status { margin-top: 12px; white-space: pre-wrap; background: #fafafa; border: 1px solid #eee; padding: 8px; }
+    .thumb { width: 120px; height: auto; }
+    .frame-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .frame { width: 120px; height: auto; border: 2px solid transparent; }
+    .frame.good { border-color: #2ecc71; }
+    .frame.bad { border-color: #e74c3c; }
+    .spinner { width: 28px; height: 28px; border: 3px solid #ccc; border-top-color: #333; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h2>Agent Builder</h2>
+  <form id="runForm">
+    <div class="row"><input type="file" name="image" required /></div>
+    <div class="row"><input type="text" name="description" placeholder="Description" style="width: 400px" required /></div>
+    <div class="row">
+      <label>Duration:</label>
+      <select name="duration">
+        <option value="5">5</option>
+        <option value="10">10</option>
+      </select>
+      <label>Num videos:</label>
+      <input type="number" name="num_videos" value="2" min="1" max="10" />
+      <label>Max frames:</label>
+      <input type="number" name="extract_frames_max" value="3" min="1" max="5" />
+      <button type="submit">Submit</button>
+    </div>
+  </form>
+
+  <div class="row" style="margin-top:12px;">
+    <label for="runSelect">Runs:</label>
+    <select id="runSelect"></select>
+    <button id="loadRunBtn" type="button">Load</button>
+  </div>
+
+  <div id="runStatus" class="status"></div>
+
+  <table id="resultsTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Start Frame</th>
+        <th>Video</th>
+        <th>Prompt</th>
+        <th>Analysis</th>
+        <th>Frames</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const form = document.getElementById('runForm');
+    const runStatus = document.getElementById('runStatus');
+    const resultsBody = document.querySelector('#resultsTable tbody');
+    const runSelect = document.getElementById('runSelect');
+    const loadRunBtn = document.getElementById('loadRunBtn');
+    let polling = null;
+    let currentRunId = null;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const resp = await fetch('/submit', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (!data.ok) { alert('Submit failed'); return; }
+      currentRunId = data.run_id;
+      resultsBody.innerHTML = '';
+      runStatus.textContent = 'Run started: ' + currentRunId;
+      updateUrl(currentRunId);
+      startPolling();
+    });
+
+    loadRunBtn.addEventListener('click', () => {
+      const selected = runSelect.value;
+      if (!selected) return;
+      currentRunId = selected;
+      resultsBody.innerHTML = '';
+      runStatus.textContent = 'Loading run: ' + currentRunId;
+      updateUrl(currentRunId);
+      startPolling();
+    });
+
+    function startPolling() {
+      if (polling) clearInterval(polling);
+      polling = setInterval(async () => {
+        const resp = await fetch('/status/' + currentRunId);
+        const data = await resp.json();
+        renderStatus(data);
+        if (isFinished(data)) {
+          clearInterval(polling);
+        }
+      }, 2000);
+    }
+
+    function updateUrl(runId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('run', runId);
+      window.history.replaceState({}, '', url);
+    }
+
+    function isFinished(data) {
+      const lin = data.lineage;
+      if (!lin) return false;
+      // Heuristic: finished if number of items equals num_videos and each has frames or was skipped
+      // We cannot know desired count here; rely on notes to signal completion
+      return (data.notes || '').includes('Run complete. Lineage written.');
+    }
+
+    function renderStatus(data) {
+      const notes = data.notes || '';
+      runStatus.textContent = notes;
+
+      const lin = data.lineage;
+      if (!lin) return;
+      const items = lin.items || [];
+      resultsBody.innerHTML = '';
+      items.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        const tdIdx = document.createElement('td');
+        tdIdx.textContent = String(idx + 1);
+        const tdStart = document.createElement('td');
+        const tdVid = document.createElement('td');
+        const tdPrompt = document.createElement('td');
+        const tdAnalysis = document.createElement('td');
+        const tdFrames = document.createElement('td');
+
+        // Start frame thumbnail if available
+        const framesDir = item.frames_dir;
+        let thumbPath = item.start_frame || null;
+        if (!thumbPath && Array.isArray(item.frames) && item.frames.length > 0) {
+          // fallback to first frame if available
+          thumbPath = item.frames[0].path || null;
+        }
+        if (thumbPath) {
+          const img = document.createElement('img');
+          img.src = '/outputs' + thumbPath.split('outputs')[1];
+          img.className = 'thumb';
+          tdStart.appendChild(img);
+        } else {
+          // Spinner while pending
+          tdStart.innerHTML = '<span class="spinner"></span>';
+        }
+
+        // Video link / spinner
+        if (item.inputs && item.inputs.video_path) {
+          const a = document.createElement('a');
+          a.href = '/outputs' + item.inputs.video_path.split('outputs')[1];
+          a.textContent = 'video';
+          a.target = '_blank';
+          tdVid.appendChild(a);
+        } else {
+          tdVid.innerHTML = '<span class="spinner"></span>';
+        }
+
+        // Prompt
+        tdPrompt.textContent = (item.inputs && item.inputs.kling_prompt) || '';
+
+        // Analysis json link
+        if (item.video_analysis) {
+          const a = document.createElement('a');
+          a.href = '/outputs' + item.video_analysis.split('outputs')[1];
+          a.textContent = 'analysis.json';
+          a.target = '_blank';
+          tdAnalysis.appendChild(a);
+        }
+
+        // Frames grid
+        const grid = document.createElement('div');
+        grid.className = 'frame-grid';
+        (item.frames || []).forEach(fr => {
+          const img = document.createElement('img');
+          img.src = '/outputs' + fr.path.split('outputs')[1];
+          const label = fr.label || '';
+          img.className = 'frame' + (label ? ' ' + label : '');
+          grid.appendChild(img);
+        });
+        tdFrames.appendChild(grid);
+
+        tr.appendChild(tdIdx);
+        tr.appendChild(tdStart);
+        tr.appendChild(tdVid);
+        tr.appendChild(tdPrompt);
+        tr.appendChild(tdAnalysis);
+        tr.appendChild(tdFrames);
+        resultsBody.appendChild(tr);
+      });
+    }
+
+    async function populateRuns() {
+      const resp = await fetch('/runs');
+      const data = await resp.json();
+      const runs = data.runs || [];
+      runSelect.innerHTML = '';
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = '-- select a run --';
+      runSelect.appendChild(opt);
+      runs.forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.id;
+        o.textContent = r.id;
+        runSelect.appendChild(o);
+      });
+
+      // If ?run= is present, select and load it
+      const url = new URL(window.location.href);
+      const qRun = url.searchParams.get('run');
+      if (qRun) {
+        runSelect.value = qRun;
+        currentRunId = qRun;
+        startPolling();
+      }
+    }
+
+    populateRuns();
+  </script>
+</body>
+</html>
+
+
