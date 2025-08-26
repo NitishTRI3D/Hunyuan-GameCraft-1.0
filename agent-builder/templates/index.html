@@ -3,41 +3,87 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agent Builder</title>
+  <title>World Builder</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
-    th { background: #f5f5f5; }
-    .status { margin-top: 12px; white-space: pre-wrap; background: #fafafa; border: 1px solid #eee; padding: 8px; }
+    :root {
+      --bg: #ffffff;
+      --card: #ffffff;
+      --muted: #475569;
+      --text: #0f172a;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --good: #16a34a;
+      --bad: #dc2626;
+    }
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    .container { max-width: 1400px; margin: 16px auto; padding: 0 8px; }
+    h2 { margin: 8px 0 12px; font-weight: 700; letter-spacing: 0.2px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+    .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    label { color: var(--muted); font-size: 14px; }
+    input[type="text"], input[type="number"], select, textarea { background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; outline: none; }
+    input[type="file"] { color: var(--muted); }
+    textarea { width: 100%; min-height: 68px; resize: vertical; }
+    button { background: var(--accent); color: white; border: 0; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 10px; }
+    .slot { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+    .slot h4 { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; table-layout: fixed; }
+    th, td { border: 1px solid var(--border); padding: 8px; vertical-align: top; }
+    th { background: #f8fafc; color: var(--muted); }
+    .status { margin-top: 10px; white-space: pre-wrap; background: #f8fafc; border: 1px solid var(--border); padding: 8px; border-radius: 8px; }
     .thumb { width: 120px; height: auto; }
-    .frame-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-    .frame { width: 120px; height: auto; border: 2px solid transparent; }
-    .frame.good { border-color: #2ecc71; }
-    .frame.bad { border-color: #e74c3c; }
-    .spinner { width: 28px; height: 28px; border: 3px solid #ccc; border-top-color: #333; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+    .end-thumb { width: 120px; height: auto; }
+    .video-cell video { width: 100%; height: auto; display: block; }
+    .prompt-cell { overflow: hidden; }
+    .prompt-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .readmore { color: var(--accent); cursor: pointer; font-size: 12px; }
+    .spinner { width: 28px; height: 28px; border: 3px solid #cbd5e1; border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <h2>Agent Builder</h2>
-  <form id="runForm">
-    <div class="row"><input type="file" name="image" required /></div>
-    <div class="row"><input type="text" name="description" placeholder="Description" style="width: 400px" required /></div>
-    <div class="row">
-      <label>Duration:</label>
-      <select name="duration">
-        <option value="5">5</option>
-        <option value="10">10</option>
-      </select>
-      <label>Num videos:</label>
-      <input type="number" name="num_videos" value="2" min="1" max="10" />
-      <label>Max frames:</label>
-      <input type="number" name="extract_frames_max" value="3" min="1" max="5" />
-      <button type="submit">Submit</button>
-    </div>
-  </form>
+  <div class="container">
+    <h2>World Builder</h2>
+    <form id="runForm" class="card">
+      <div class="row">
+        <label>Head image</label>
+        <input type="file" name="image" required />
+        <img id="headPreview" alt="head preview" style="display:none; max-height:80px; border:1px solid var(--border); border-radius:6px;" />
+      </div>
+      <div class="row">
+        <input type="text" name="description" placeholder="Describe the scene (e.g., modern glass-walled office)" style="flex:1" required />
+      </div>
+      <div class="row">
+        <label>Duration</label>
+        <select name="duration">
+          <option value="5">5</option>
+          <option value="10">10</option>
+        </select>
+        <label>Num videos</label>
+        <input type="number" name="num_videos" value="2" min="1" max="10" />
+        <label>Max frames</label>
+        <input type="number" name="extract_frames_max" value="3" min="1" max="12" />
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="useSameImage" checked /> Use same image for tail</label>
+        <input type="file" id="tailImage" name="tail_image" style="display:none;" />
+      </div>
+
+      <div class="row" style="margin-top: 8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color:var(--muted);">Per‑video prompts</span>
+          <button type="button" class="secondary" id="autoFillBtn">Auto-fill from moves</button>
+        </div>
+      </div>
+      <div id="slots" class="grid"></div>
+
+      <input type="hidden" name="kling_prompts_json" id="klingPromptsJson" />
+      <div class="row" style="justify-content:flex-end; margin-top: 8px;">
+        <button type="submit">Generate</button>
+      </div>
+    </form>
 
   <div class="row" style="margin-top:12px;">
     <label for="runSelect">Runs:</label>
@@ -50,12 +96,13 @@
   <table id="resultsTable">
     <thead>
       <tr>
-        <th>#</th>
-        <th>Start Frame</th>
-        <th>Video</th>
-        <th>Prompt</th>
-        <th>Analysis</th>
-        <th>Frames</th>
+        <th style="width:5%;">#</th>
+        <th style="width:15%;">Start</th>
+        <th style="width:15%;">End</th>
+        <th style="width:30%;">Video</th>
+        <th style="width:15%;">Prompt</th>
+        <th style="width:15%;">Analysis</th>
+        <th style="width:5%;">Frames</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -67,11 +114,31 @@
     const resultsBody = document.querySelector('#resultsTable tbody');
     const runSelect = document.getElementById('runSelect');
     const loadRunBtn = document.getElementById('loadRunBtn');
+    const useSameImage = document.getElementById('useSameImage');
+    const tailImage = document.getElementById('tailImage');
+    const slots = document.getElementById('slots');
+    const autoFillBtn = document.getElementById('autoFillBtn');
+    const klingPromptsJson = document.getElementById('klingPromptsJson');
+    const headPreview = document.getElementById('headPreview');
+    // Head image preview
+    form.elements['image'].addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) { headPreview.style.display = 'none'; headPreview.src = ''; return; }
+      const url = URL.createObjectURL(file);
+      headPreview.src = url;
+      headPreview.style.display = 'inline-block';
+    });
     let polling = null;
     let currentRunId = null;
+    let moveData = { scene: 'indoor', indoor_moves: [], outdoor_moves: [] };
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      // Collect prompts from slots
+      const prompts = Array.from(document.querySelectorAll('.slot textarea')).map(t => t.value.trim()).filter(Boolean);
+      document.getElementsByName('num_videos')[0].value = String(prompts.length || Number(document.getElementsByName('num_videos')[0].value));
+      klingPromptsJson.value = JSON.stringify(prompts);
+
       const fd = new FormData(form);
       const resp = await fetch('/submit', { method: 'POST', body: fd });
       const data = await resp.json();
@@ -82,6 +149,107 @@
       updateUrl(currentRunId);
       startPolling();
     });
+    // Tail image toggle
+    useSameImage.addEventListener('change', () => {
+      tailImage.style.display = useSameImage.checked ? 'none' : 'block';
+      if (useSameImage.checked) tailImage.value = '';
+    });
+
+    // Slot rendering
+    function renderSlots() {
+      const count = Number(document.getElementsByName('num_videos')[0].value || '0');
+      slots.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const div = document.createElement('div');
+        div.className = 'slot';
+        const title = document.createElement('h4');
+        title.textContent = `Video ${i+1}`;
+        const select = document.createElement('select');
+        select.innerHTML = '';
+        const optNone = document.createElement('option');
+        optNone.value = '';
+        optNone.textContent = '-- choose a move --';
+        select.appendChild(optNone);
+
+        function addGroup(label, list) {
+          const og = document.createElement('optgroup');
+          og.label = label;
+          list.forEach(m => {
+            const o = document.createElement('option');
+            o.value = m.description || m.type;
+            o.textContent = `${m.type}`;
+            og.appendChild(o);
+          });
+          select.appendChild(og);
+        }
+        addGroup('Indoor', moveData.indoor_moves || []);
+        addGroup('Outdoor', moveData.outdoor_moves || []);
+
+        const ta = document.createElement('textarea');
+
+        select.addEventListener('change', () => {
+          if (!select.value) return;
+          const baseDesc = document.getElementsByName('description')[0].value.trim();
+          ta.value = buildPrompt(baseDesc, select.value);
+        });
+
+        div.appendChild(title);
+        div.appendChild(select);
+        div.appendChild(ta);
+        slots.appendChild(div);
+      }
+    }
+
+    function buildPrompt(base, moveText) {
+      let desc = (base || '').trim();
+      if (desc && !desc.endsWith('.')) desc += '.';
+      const safety = ' No humans in the video. No moving objects in the video.';
+      const move = moveText || 'slow camera move';
+      const clause = ` Camera: ${move}. Return to original composition at end.`;
+      return (desc + clause + safety).trim();
+    }
+
+    async function refreshMoves() {
+      const baseDesc = document.getElementsByName('description')[0].value;
+      const url = '/moves' + (baseDesc ? ('?description=' + encodeURIComponent(baseDesc)) : '');
+      try {
+        const r = await fetch(url);
+        moveData = await r.json();
+      } catch { moveData = { scene: 'indoor', indoor_moves: [], outdoor_moves: [] }; }
+    }
+
+    document.getElementsByName('num_videos')[0].addEventListener('change', () => {
+      renderSlots();
+    });
+    document.getElementsByName('description')[0].addEventListener('blur', async () => {
+      await refreshMoves();
+      renderSlots();
+    });
+
+    autoFillBtn.addEventListener('click', () => {
+      const count = Number(document.getElementsByName('num_videos')[0].value || '0');
+      const pool = (moveData.scene === 'outdoor') ? moveData.outdoor_moves : moveData.indoor_moves;
+      const chosen = [];
+      for (let i = 0; i < count; i++) {
+        const m = pool[i % pool.length];
+        chosen.push(m);
+      }
+      const baseDesc = document.getElementsByName('description')[0].value.trim();
+      const textareas = Array.from(document.querySelectorAll('.slot textarea'));
+      const selects = Array.from(document.querySelectorAll('.slot select'));
+      chosen.forEach((m, idx) => {
+        if (!m) return;
+        const moveText = m.description || m.type;
+        selects[idx].value = moveText;
+        textareas[idx].value = buildPrompt(baseDesc, moveText);
+      });
+    });
+
+    // Initial
+    (async function init() {
+      await refreshMoves();
+      renderSlots();
+    })();
 
     loadRunBtn.addEventListener('click', () => {
       const selected = runSelect.value;
@@ -132,8 +300,11 @@
         const tdIdx = document.createElement('td');
         tdIdx.textContent = String(idx + 1);
         const tdStart = document.createElement('td');
+        const tdEnd = document.createElement('td');
         const tdVid = document.createElement('td');
+        tdVid.className = 'video-cell';
         const tdPrompt = document.createElement('td');
+        tdPrompt.className = 'prompt-cell';
         const tdAnalysis = document.createElement('td');
         const tdFrames = document.createElement('td');
 
@@ -154,19 +325,46 @@
           tdStart.innerHTML = '<span class="spinner"></span>';
         }
 
-        // Video link / spinner
+        // End frame thumbnail if available
+        let endThumb = item.end_frame || null;
+        if (endThumb) {
+          const img = document.createElement('img');
+          img.src = '/outputs' + endThumb.split('outputs')[1];
+          img.className = 'end-thumb';
+          tdEnd.appendChild(img);
+        } else {
+          tdEnd.innerHTML = '<span class="spinner"></span>';
+        }
+
+        // Inline video / spinner
         if (item.inputs && item.inputs.video_path) {
-          const a = document.createElement('a');
-          a.href = '/outputs' + item.inputs.video_path.split('outputs')[1];
-          a.textContent = 'video';
-          a.target = '_blank';
-          tdVid.appendChild(a);
+          const video = document.createElement('video');
+          video.controls = true;
+          video.src = '/outputs' + item.inputs.video_path.split('outputs')[1];
+          tdVid.appendChild(video);
         } else {
           tdVid.innerHTML = '<span class="spinner"></span>';
         }
 
-        // Prompt
-        tdPrompt.textContent = (item.inputs && item.inputs.kling_prompt) || '';
+        // Prompt with read-more
+        const promptText = (item.inputs && item.inputs.kling_prompt) || '';
+        const span = document.createElement('div');
+        span.className = 'prompt-text';
+        span.textContent = promptText;
+        const rm = document.createElement('div');
+        rm.className = 'readmore';
+        rm.textContent = 'read more';
+        rm.addEventListener('click', () => {
+          if (span.style.display === '-webkit-box') {
+            span.style.display = 'block';
+            rm.textContent = 'read less';
+          } else {
+            span.style.display = '-webkit-box';
+            rm.textContent = 'read more';
+          }
+        });
+        tdPrompt.appendChild(span);
+        if (promptText.length > 120) tdPrompt.appendChild(rm);
 
         // Analysis json link
         if (item.video_analysis) {
@@ -191,6 +389,7 @@
 
         tr.appendChild(tdIdx);
         tr.appendChild(tdStart);
+        tr.appendChild(tdEnd);
         tr.appendChild(tdVid);
         tr.appendChild(tdPrompt);
         tr.appendChild(tdAnalysis);

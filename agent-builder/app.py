@@ -15,7 +15,16 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RUNS_FOLDER'], exist_ok=True)
 
 
-def launch_run(image_path: str, description: str, duration: int, num_videos: int, extract_frames_max: int, run_id: str):
+def launch_run(
+    image_path: str,
+    description: str,
+    duration: int,
+    num_videos: int,
+    extract_frames_max: int,
+    run_id: str,
+    tail_image_path: str | None = None,
+    kling_prompts_json: str | None = None,
+):
     # Invoke the main agent synchronously (runs in background thread)
     cmd = [
         'python', 'main.py',
@@ -26,6 +35,10 @@ def launch_run(image_path: str, description: str, duration: int, num_videos: int
         '--extract_frames_max', str(extract_frames_max),
         '--run_id', run_id,
     ]
+    if tail_image_path:
+        cmd += ["--tail_image", tail_image_path]
+    if kling_prompts_json:
+        cmd += ["--kling_prompts_json", kling_prompts_json]
     subprocess.Popen(cmd, cwd=os.path.dirname(__file__))
 
 
@@ -51,9 +64,23 @@ def submit():
     num_videos = int(request.form.get('num_videos', '3'))
     extract_frames_max = int(request.form.get('extract_frames_max', '12'))
 
+    # Optional tail image support
+    tail_image_file = request.files.get('tail_image')
+    tail_image_path = None
+    if tail_image_file and getattr(tail_image_file, 'filename', ''):
+        tail_filename = secure_filename(tail_image_file.filename)
+        tail_image_path = os.path.join(app.config['UPLOAD_FOLDER'], tail_filename)
+        tail_image_file.save(tail_image_path)
+
+    # Optional per-video prompt overrides
+    kling_prompts_json = request.form.get('kling_prompts_json', None)
+
     run_id = datetime.now().strftime('%Y%m%d_%H%M%S') + '_' + uuid.uuid4().hex[:6]
 
-    t = threading.Thread(target=launch_run, args=(image_path, description, duration, num_videos, extract_frames_max, run_id))
+    t = threading.Thread(
+        target=launch_run,
+        args=(image_path, description, duration, num_videos, extract_frames_max, run_id, tail_image_path, kling_prompts_json)
+    )
     t.daemon = True
     t.start()
 
@@ -106,6 +133,23 @@ def list_runs():
     except Exception:
         runs = []
     return jsonify({'runs': runs})
+
+
+@app.route('/moves')
+def moves():
+    # Return available moves and a scene suggestion for the given description
+    try:
+        from tools.camera_planner import INDOOR_MOVES, OUTDOOR_MOVES, detect_scene_type
+    except Exception:
+        INDOOR_MOVES, OUTDOOR_MOVES, detect_scene_type = [], [], lambda d: 'indoor'
+
+    description = request.args.get('description', '')
+    scene = detect_scene_type(description) if description else 'indoor'
+    return jsonify({
+        'scene': scene,
+        'indoor_moves': INDOOR_MOVES,
+        'outdoor_moves': OUTDOOR_MOVES,
+    })
 
 
 @app.route('/outputs/<path:subpath>')

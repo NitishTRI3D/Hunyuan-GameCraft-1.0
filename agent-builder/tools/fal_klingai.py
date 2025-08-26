@@ -104,6 +104,7 @@ def generate_video(
     cfg_scale: float = 0.5,
     negative_prompt: str = "blur, distort, and low quality",
     prompt_override: Optional[str] = None,
+    tail_image_path: Optional[str] = None,
 ) -> Tuple[Dict, str]:
     """
     Invoke Kling 2.1 (pro) Image-to-Video with the same image as head and tail.
@@ -115,6 +116,9 @@ def generate_video(
 
     fal_key = _get_fal_key()
     image_data_uri = encode_image_to_data_uri(image_path)
+    tail_image_data_uri = (
+        encode_image_to_data_uri(tail_image_path) if tail_image_path else image_data_uri
+    )
     prompt = prompt_override if prompt_override else _build_prompt(description)
     # prompt = "A modern glass-walled office with racing posters, sleek furniture, glass walls. Move camera towards right, 360 degree to come back to same position. No humans in the office. No moving objects as the camera is panning. Still Office."
 
@@ -128,7 +132,7 @@ def generate_video(
             args = {
                 "prompt": prompt,
                 "image_url": image_data_uri,
-                "tail_image_url": image_data_uri,
+                "tail_image_url": tail_image_data_uri,
                 "duration": str(duration_seconds),  # "5" or "10"
                 "negative_prompt": negative_prompt,
                 "cfg_scale": float(cfg_scale),
@@ -149,7 +153,7 @@ def generate_video(
     payload_top = {
         "prompt": prompt,
         "image_url": image_data_uri,
-        "tail_image_url": image_data_uri,
+        "tail_image_url": tail_image_data_uri,
         "duration": str(duration_seconds),
         "negative_prompt": negative_prompt,
         "cfg_scale": float(cfg_scale),
@@ -200,6 +204,7 @@ def generate_and_save(
     cfg_scale: float = 0.5,
     negative_prompt: str = "blur, distort, and low quality",
     prompt_override: Optional[str] = None,
+    tail_image_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     High-level helper: generates the video and saves it to output_path.
@@ -212,6 +217,7 @@ def generate_and_save(
         cfg_scale=cfg_scale,
         negative_prompt=negative_prompt,
         prompt_override=prompt_override,
+        tail_image_path=tail_image_path,
     )
     download_file(video_url, output_path)
     return {

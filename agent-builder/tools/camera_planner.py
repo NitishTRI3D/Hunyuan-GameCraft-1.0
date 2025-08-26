@@ -5,14 +5,14 @@ from typing import Dict, List, Optional
 
 INDOOR_MOVES: List[Dict] = [
     {"type": "dolly_in", "intensity": "high", "description": "fast dolly forward 1-2 meters, subtle parallax"},
-    # {"type": "dolly_out", "intensity": "slow", "description": "slow dolly backward, maintain composition"},
-    # {"type": "truck_left", "intensity": "slow", "description": "lateral move left with gentle parallax"},
-    # {"type": "truck_right", "intensity": "slow", "description": "lateral move right with gentle parallax"},
+    {"type": "dolly_out", "intensity": "slow", "description": "slow dolly backward, maintain composition"},
+    {"type": "truck_left", "intensity": "slow", "description": "lateral move left with gentle parallax"},
+    {"type": "truck_right", "intensity": "slow", "description": "lateral move right with gentle parallax"},
     {"type": "pan_left", "intensity": "high", "description": "Move camera towards right, 360 degree to come back to same position. No humans in the office. No moving objects as the camera is panning. Still Office."},
-    # {"type": "pan_right", "intensity": "slow", "description": "slow pan right, keep horizon stable"},
-    # {"type": "orbit_small", "intensity": "slow", "description": "small 90° orbit around center of scene"},
-    # {"type": "zoom_in", "intensity": "gentle", "description": "gentle optical zoom in, no exposure change"},
-    # {"type": "zoom_out", "intensity": "gentle", "description": "gentle optical zoom out, no exposure change"},
+    {"type": "pan_right", "intensity": "slow", "description": "slow pan right, keep horizon stable"},
+    {"type": "orbit_small", "intensity": "slow", "description": "small 90° orbit around center of scene"},
+    {"type": "zoom_in", "intensity": "gentle", "description": "gentle optical zoom in, no exposure change"},
+    {"type": "zoom_out", "intensity": "gentle", "description": "gentle optical zoom out, no exposure change"},
     {"type": "pedestal_up", "intensity": "fast", "description": "slow crane up by 1-2meter, keep framing centered"},
 ]
 

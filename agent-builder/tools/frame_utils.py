@@ -68,3 +68,29 @@ def extract_start_frame(video_path: str, output_image_path: str) -> bool:
         return False
 
 
+
+def extract_end_frame(video_path: str, output_image_path: str) -> bool:
+    """
+    Save the last frame of the video to output_image_path (JPEG). Returns True on success.
+    """
+    if cv2 is None:
+        return False
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return False
+    try:
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        # Seek to last frame index (total - 1)
+        if total > 1:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, total - 1))
+        ok, frame = cap.read()
+    finally:
+        cap.release()
+    if not ok or frame is None:
+        return False
+    os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+    try:
+        return bool(cv2.imwrite(output_image_path, frame))
+    except Exception:
+        return False
+

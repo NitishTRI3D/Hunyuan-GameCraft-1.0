@@ -8,7 +8,7 @@ import uuid
 from tools.fal_klingai import generate_and_save
 from tools.gemini_analyzer import analyze_video_motion, classify_frame_consistency
 from tools.camera_planner import propose_movements, build_kling_prompt
-from tools.frame_utils import extract_frames, extract_start_frame
+from tools.frame_utils import extract_frames, extract_start_frame, extract_end_frame
 
 
 def main() -> None:
@@ -41,6 +41,8 @@ def main() -> None:
     parser.add_argument("--extract_frames_max", type=int, default=12, help="Max frames to extract per video")
     parser.add_argument("--num_videos", type=int, default=3, help="How many videos to generate in this run")
     parser.add_argument("--no_gemini", action="store_true", help="Disable Gemini call in analysis")
+    parser.add_argument("--tail_image", default=None, help="Optional tail image to use at end")
+    parser.add_argument("--kling_prompts_json", default=None, help="JSON array of per-video prompt overrides")
 
     args = parser.parse_args()
 
@@ -82,15 +84,33 @@ def main() -> None:
         with open(notes_path, "a", encoding="utf-8") as nf:
             nf.write(f"[{ts}] {msg}\n")
 
-    movements = propose_movements(args.description, args.num_videos)
-    note(f"Planned {len(movements)} camera movements for scene: {args.description}")
-    for m in movements:
-        mt = m.get("type")
-        md = m.get("description")
-        note(f"Plan: {mt} - {md}")
+    # Determine plan: either user-provided prompts or auto-planned movements
+    user_prompts = None
+    if args.kling_prompts_json:
+        try:
+            user_prompts = json.loads(args.kling_prompts_json)
+            if not isinstance(user_prompts, list):
+                user_prompts = None
+        except Exception:
+            user_prompts = None
+
+    if user_prompts:
+        # Truncate or pad to num_videos
+        planned_count = min(len(user_prompts), args.num_videos)
+        movements = [{"type": "custom", "description": "user"} for _ in range(planned_count)]
+        kling_prompts = user_prompts[:planned_count]
+        note(f"Using {planned_count} user-provided prompts.")
+    else:
+        movements = propose_movements(args.description, args.num_videos)
+        note(f"Planned {len(movements)} camera movements for scene: {args.description}")
+        for m in movements:
+            mt = m.get("type")
+            md = m.get("description")
+            note(f"Plan: {mt} - {md}")
+        kling_prompts = [build_kling_prompt(args.description, m) for m in movements]
 
     for idx, move in enumerate(movements, start=1):
-        kling_prompt = build_kling_prompt(args.description, move)
+        kling_prompt = kling_prompts[idx - 1]
         base_name = os.path.splitext(os.path.basename(args.image))[0]
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         video_filename = f"kling_{base_name}_{args.duration}s_{idx:02d}_{ts}.mp4"
@@ -121,23 +141,30 @@ def main() -> None:
             output_path=output_path,
             duration_seconds=args.duration,
             prompt_override=kling_prompt,
+            tail_image_path=(args.tail_image if args.tail_image else None),
         )
         t1 = time.monotonic()
         print(f"Saved video: {result['output_path']}")
         note(f"Saved video: {result['output_path']} (elapsed {(t1 - t0):.2f}s)")
 
-        # Write a start-frame thumbnail immediately for UI
+        # Write a start-frame and end-frame thumbnails immediately for UI
         video_stem = os.path.splitext(video_filename)[0]
         start_thumb_path = os.path.join(videos_dir, f"{video_stem}_start.jpg")
+        end_thumb_path = os.path.join(videos_dir, f"{video_stem}_end.jpg")
         if extract_start_frame(result['output_path'], start_thumb_path):
             note(f"Start frame extracted: {start_thumb_path}")
         else:
             note("Failed to extract start frame.")
+        if extract_end_frame(result['output_path'], end_thumb_path):
+            note(f"End frame extracted: {end_thumb_path}")
+        else:
+            note("Failed to extract end frame.")
 
         # Update lineage item after generation
         item["inputs"]["video_path"] = result["output_path"]
         item["inputs"]["generation_seconds"] = (t1 - t0)
         item["start_frame"] = start_thumb_path if os.path.exists(start_thumb_path) else None
+        item["end_frame"] = end_thumb_path if os.path.exists(end_thumb_path) else None
         item["status"] = "generated"
         persist_lineage()
 
